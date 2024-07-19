@@ -23,11 +23,10 @@ console.log(JSON.stringify(cfenv.getAppEnv()));
 // Default Mongo URI is local
 const DOCKER = process.env.DOCKER
 if (DOCKER === '1') {
-  var mongoUri = 'mongodb://goof-mongo/express-todo';
+  var mongoUri = process.env.MONGO_DOCKER_URI;
 } else {
-  var mongoUri = 'mongodb://localhost/express-todo';
+  var mongoUri = process.env.MONGO_LOCAL_URI;
 }
-
 
 // CloudFoundry Mongo URI
 if (mongoCFUri) {
@@ -45,11 +44,11 @@ console.log("Using Mongo URI " + mongoUri);
 mongoose.connect(mongoUri);
 
 User = mongoose.model('User');
-User.find({ username: 'admin@snyk.io' }).exec(function (err, users) {
+User.find({ username: process.env.ADMIN_USERNAME }).exec(function (err, users) {
   console.log(users);
   if (users.length === 0) {
     console.log('no admin');
-    new User({ username: 'admin@snyk.io', password: 'SuperSecretPassword' }).save(function (err, user, count) {
+    new User({ username: process.env.ADMIN_USERNAME, password: process.env.ADMIN_PASSWORD }).save(function (err, user, count) {
       if (err) {
         console.log('error saving admin user');
       }
