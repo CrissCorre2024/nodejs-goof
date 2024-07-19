@@ -1,29 +1,33 @@
+const express = require('express');
+const path = require('path');
+const validator = require('validator');
+const mongoose = require('mongoose');
+const Todo = mongoose.model('Todo');
+const User = mongoose.model('User');
+
 var utils = require('../utils');
-var mongoose = require('mongoose');
-var Todo = mongoose.model('Todo');
-var User = mongoose.model('User');
-// TODO:
 var hms = require('humanize-ms');
 var ms = require('ms');
 var streamBuffers = require('stream-buffers');
 var readline = require('readline');
 var moment = require('moment');
 var exec = require('child_process').exec;
-var validator = require('validator');
-
-// zip-slip
 var fileType = require('file-type');
 var AdmZip = require('adm-zip');
 var fs = require('fs');
-
-// prototype-pollution
 var _ = require('lodash');
 
+// Lista de rutas permitidas para redirección
+const allowedPaths = ['/admin', '/profile', '/dashboard'];
+
+function validateRedirectPage(redirectPage) {
+  return allowedPaths.includes(redirectPage);
+}
+
 exports.index = function (req, res, next) {
-  Todo.
-    find({}).
-    sort('-updated_at').
-    exec(function (err, todos) {
+  Todo.find({})
+    .sort('-updated_at')
+    .exec(function (err, todos) {
       if (err) return next(err);
 
       res.render('index', {
@@ -54,15 +58,15 @@ exports.loginHandler = function (req, res, next) {
 };
 
 function adminLoginSuccess(redirectPage, session, username, res) {
-  session.loggedIn = 1
+  session.loggedIn = 1;
 
   // Log the login action for audit
-  console.log(User logged in: ${username})
+  console.log(`User logged in: ${username}`);
 
-  if (redirectPage) {
-      return res.redirect(redirectPage)
+  if (redirectPage && validateRedirectPage(redirectPage)) {
+    return res.redirect(redirectPage);
   } else {
-      return res.redirect('/admin')
+    return res.redirect('/admin');
   }
 }
 
@@ -82,33 +86,22 @@ exports.admin = function (req, res, next) {
 };
 
 exports.get_account_details = function(req, res, next) {
-  // @TODO need to add a database call to get the profile from the database
-  // and provide it to the view to display
   const profile = {}
- 	return res.render('account.hbs', profile)
+  return res.render('account.hbs', profile)
 }
 
 exports.save_account_details = function(req, res, next) {
-  // get the profile details from the JSON
-	const profile = req.body
-  // validate the input
+  const profile = req.body
   if (validator.isEmail(profile.email, { allow_display_name: true })
-    // allow_display_name allows us to receive input as:
-    // Display Name <email-address>
-    // which we consider valid too
     && validator.isMobilePhone(profile.phone, 'he-IL')
     && validator.isAscii(profile.firstname)
     && validator.isAscii(profile.lastname)
     && validator.isAscii(profile.country)
   ) {
-    // trim any extra spaces on the right of the name
     profile.firstname = validator.rtrim(profile.firstname)
     profile.lastname = validator.rtrim(profile.lastname)
-
-    // render the view
     return res.render('account.hbs', profile)
   } else {
-    // if input validation fails, we just render the view as is
     console.log('error in form details')
     return res.render('account.hbs')
   }
@@ -142,7 +135,6 @@ function parse(todo) {
 
     console.log('period: ' + period);
 
-    // remove it
     t = t.slice(0, reminder);
     if (typeof period != 'undefined') {
       t += ' [' + ms(period) + ']';
@@ -152,8 +144,6 @@ function parse(todo) {
 }
 
 exports.create = function (req, res, next) {
-  // console.log('req.body: ' + JSON.stringify(req.body));
-
   var item = req.body.content;
   var imgRegex = /\!\[alt text\]\((http.*)\s\".*/;
   if (typeof (item) == 'string' && item.match(imgRegex)) {
@@ -177,20 +167,12 @@ exports.create = function (req, res, next) {
   }).save(function (err, todo, count) {
     if (err) return next(err);
 
-    /*
-    res.setHeader('Data', todo.content.toString('base64'));
-    res.redirect('/');
-    */
-
     res.setHeader('Location', '/');
     res.status(302).send(todo.content.toString('base64'));
-
-    // res.redirect('/#' + todo.content.toString('base64'));
   });
 };
 
 exports.destroy = function (req, res, next) {
-  // Usa findById para buscar el todo
   Todo.findById(req.params.id, function (err, todo) {
     if (err) return next(err);
     if (todo) {
@@ -205,10 +187,9 @@ exports.destroy = function (req, res, next) {
 };
 
 exports.edit = function (req, res, next) {
-  Todo.
-    find({}).
-    sort('-updated_at').
-    exec(function (err, todos) {
+  Todo.find({})
+    .sort('-updated_at')
+    .exec(function (err, todos) {
       if (err) return next(err);
 
       res.render('edit', {
@@ -235,9 +216,7 @@ exports.update = function (req, res, next) {
   });
 };
 
-// ** express turns the cookie key to lowercase **
 exports.current_user = function (req, res, next) {
-
   next();
 };
 
@@ -259,7 +238,7 @@ exports.import = function (req, res, next) {
     importedFileType = { ext: "txt", mime: "text/plain" };
   }
   if (importedFileType["mime"] === zipFileExt["mime"]) {
-    var zip = AdmZip(importFile.data);
+    var zip = new AdmZip(importFile.data);
     var extracted_path = "/tmp/extracted_files";
     zip.extractAllTo(extracted_path, true);
     data = "No backup.txt file found";
@@ -313,14 +292,8 @@ exports.about_new = function (req, res, next) {
 };
 
 // Prototype Pollution
-
-///////////////////////////////////////////////////////////////////////////////
-// In order of simplicity we are not using any database. But you can write the
-// same logic using MongoDB.
 const users = [
-  // You know password for the user.
   { name: 'user', password: 'pwd' },
-  // You don't know password for the admin.
   { name: 'admin', password: Math.random().toString(32), canDelete: true },
 ];
 
@@ -330,45 +303,75 @@ let lastId = 1;
 function findUser(auth) {
   return users.find((u) =>
     u.name === auth.name &&
-    u.password === auth.password);
+    u.password === auth.password
+  )
 }
-///////////////////////////////////////////////////////////////////////////////
 
-exports.chat = {
-  get(req, res) {
+exports.login_json = function (req, res, next) {
+  const auth = req.body;
+  const user = findUser(auth);
+  if (user) {
+    res.send(_.omit(user, 'password'));
+  } else {
+    res.status(401).send('Invalid credentials');
+  }
+};
+
+exports.messages = function (req, res, next) {
+  const auth = req.body;
+  const user = findUser(auth);
+  if (user) {
     res.send(messages);
-  },
-  add(req, res) {
-    const user = findUser(req.body.auth || {});
+  } else {
+    res.status(401).send('Invalid credentials');
+  }
+};
 
-    if (!user) {
-      res.status(403).send({ ok: false, error: 'Access denied' });
-      return;
-    }
+exports.message = function (req, res, next) {
+  const auth = req.body.auth;
+  const user = findUser(auth);
+  if (user) {
+    const message = { user, text: req.body.text, id: lastId++ };
+    messages.push(message);
+    res.send(message);
+  } else {
+    res.status(401).send('Invalid credentials');
+  }
+};
 
-    const message = {
-      // Default message icon. Cen be overwritten by user.
-      icon: '👋',
-    };
+exports.delete_message = function (req, res, next) {
+  const auth = req.body.auth;
+  const user = findUser(auth);
+  if (user && user.canDelete) {
+    messages = messages.filter((msg) => msg.id != req.body.id);
+    res.send(messages);
+  } else {
+    res.status(401).send('Unauthorized');
+  }
+};
 
-    _.merge(message, req.body.message, {
-      id: lastId++,
-      timestamp: Date.now(),
-      userName: user.name,
+exports.print_message = function (req, res, next) {
+  const id = req.query.id;
+  const message = messages.find((msg) => msg.id == id);
+  if (message) {
+    const buffer = new streamBuffers.WritableStreamBuffer({
+      initialSize: 100 * 1024,
+      incrementAmount: 10 * 1024,
     });
 
-    messages.push(message);
-    res.send({ ok: true });
-  },
-  delete(req, res) {
-    const user = findUser(req.body.auth || {});
+    const rl = readline.createInterface({
+      input: fs.createReadStream(message.user.name),
+      output: buffer,
+    });
 
-    if (!user || !user.canDelete) {
-      res.status(403).send({ ok: false, error: 'Access denied' });
-      return;
-    }
+    rl.on('line', (line) => {
+      console.log(line);
+    });
 
-    messages = messages.filter((m) => m.id !== req.body.messageId);
-    res.send({ ok: true });
+    rl.on('close', () => {
+      res.send(buffer.getContentsAsString('utf8'));
+    });
+  } else {
+    res.status(404).send('Message not found');
   }
 };
