@@ -4,47 +4,49 @@
 
 // mongoose setup
 require('./mongoose-db');
-require('./typeorm-db');
+require('./typeorm-db')
 
 var st = require('st');
+var crypto = require('crypto');
 var express = require('express');
+var http = require('http');
 var path = require('path');
 var ejsEngine = require('ejs-locals');
 var bodyParser = require('body-parser');
-var session = require('express-session');
+var session = require('express-session')
 var methodOverride = require('method-override');
 var logger = require('morgan');
 var errorHandler = require('errorhandler');
+var optional = require('optional');
 var marked = require('marked');
 var fileUpload = require('express-fileupload');
+var dust = require('dustjs-linkedin');
+var dustHelpers = require('dustjs-helpers');
 var cons = require('consolidate');
-const hbs = require('hbs');
+const hbs = require('hbs')
 
 var app = express();
 var routes = require('./routes');
-var routesUsers = require('./routes/users.js');
+var routesUsers = require('./routes/users.js')
 
 // all environments
 app.set('port', process.env.PORT || 3001);
 app.engine('ejs', ejsEngine);
+app.engine('dust', cons.dust);
 app.engine('hbs', hbs.__express);
-cons.dust.helpers = require('dustjs-helpers'); // Ensure you import helpers if using dust
+cons.dust.helpers = dustHelpers;
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
-
 app.use(logger('dev'));
 app.use(methodOverride());
+app.use(session({
+  secret: 'keyboard cat',
+  name: 'connect.sid',
+  cookie: { path: '/' }
+}))
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(fileUpload());
-
-// Session configuration
-const sessionSecret = process.env.SESSION_SECRET || 'default_secret';
-app.use(session({
-  secret: sessionSecret,
-  name: 'connect.sid',
-  cookie: { path: '/' }
-}));
 
 // Routes
 app.use(routes.current_user);
@@ -64,7 +66,7 @@ app.get('/about_new', routes.about_new);
 app.get('/chat', routes.chat.get);
 app.put('/chat', routes.chat.add);
 app.delete('/chat', routes.chat.delete);
-app.use('/users', routesUsers);
+app.use('/users', routesUsers)
 
 // Static
 app.use(st({ path: './public', url: '/public' }));
@@ -73,18 +75,17 @@ app.use(st({ path: './public', url: '/public' }));
 marked.setOptions({ sanitize: true });
 app.locals.marked = marked;
 
-// Error handling
-if (app.get('env') === 'development') {
+// development only
+if (app.get('env') == 'development') {
   app.use(errorHandler());
-} else {
-  // Implement a more robust error handler for production
-  app.use((err, req, res, next) => {
-    res.status(err.status || 500);
-    res.render('error', {
-      message: err.message,
-      error: {}
-    });
-  });
 }
 
-console.log('App running on port ' + app.get('port'));
+var token = 'SECRET_TOKEN_f8ed84e8f41e4146403dd4a6bbcea5e418d23a9';
+console.log('token: ' + token);
+
+const sessionSecret = process.env.SESSION_SECRET || 'default_secret';
+app.use(session({
+  secret: sessionSecret,
+  name: 'connect.sid',
+  cookie: { path: '/' }
+}));
